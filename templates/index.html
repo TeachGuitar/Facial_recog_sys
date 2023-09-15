@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard</title>
+    <style>
+        /* Reset some default browser styles */
+        body, h1, h2, p, ul, li {
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+        }
+
+        header {
+            background-color: #0056b3;
+            color: #fff;
+            text-align: right;
+            padding: 20px 0;
+        }
+
+        nav {
+            background-color: #007bff;
+        }
+
+        nav ul {
+            list-style-type: none;
+            padding: 10px 0;
+            margin-left: 20px;
+        }
+
+        nav li {
+            display: inline;
+            margin-right: 20px;
+        }
+
+        nav a {
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+        }
+
+        /* Style the "Home" link */
+        nav a:hover {
+            color: #003f7f; /* Darker color when hovered */
+        }
+
+        main {
+            max-width: 800px;
+            margin: 20px auto;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        /* Style the username in the header */
+        #username {
+            color: #ff9900;
+        }
+
+        #name{
+            margin-right: 20px;
+        }
+
+        .active{
+            color: #003f7f;
+        }
+
+        .active:hover {
+            color: #fff; /* Darker color when hovered */
+        }
+
+        #startButton {
+            display: block;
+            margin: 0 auto; 
+            background-color: #0074d9; 
+            color: #fff; 
+            padding: 10px 20px; 
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        #uploadButton {
+            display: block;
+            margin: 0 auto; 
+            background-color: #0074d9; 
+            color: #fff; 
+            padding: 10px 20px; 
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <p id="name"> {{ user.first_name }} {{ user.last_name }} <a href="{% url 'signout' %}">logout</a></p>
+    </header>
+    <nav>
+        <ul>
+            <li><a class="active" href="#">ลงทะเบียนใบหน้า</a></li>
+            <li><a href="#">ข้อมูลส่วนตัว</a></li>
+            <li><a href="#">ประวัติการเข้าเรียน</a></li>
+            <li><a href="#">ถ่ายทอดสด</a></li>
+        </ul>
+    </nav>
+    <main>
+        <section id="container">
+            <h2>ลงทะเบียนใบหน้า</h2>
+            <p id="con1" style="color: rgb(0, 0, 0);">โปรดแสกนใบหน้าเพื่อบันทึกเป็นข้อมูลสำหรับการเช็คชื่อเข้าเรียน กรุณาอยู่ในพื้นที่ที่มีแสงสว่างเพียงพอ คุณจำเป็นต้องปฏิบัติตามคำแนะนำ เป็นเวลา 90 วินาที</p>
+            <p id="con2" style="display: none; color: red;">กรุณามองตรงมาที่กล้อง (1/9)</p>
+            <div id="timer" style="display: none; margin-left: 20px; color: red;">10</div>
+            <button id="startButton">เริ่มบันทึก</button>
+            <video id="webcam" autoplay playsinline style="transform: scaleX(-1); display: none;"></video>
+            <video id="recordedVideo" controls style="display: none;"></video>
+            <button id="uploadButton" style="display: none;" preload="auto">อัปโหลด</button>
+        </section>
+    </main>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+        // Your JavaScript code here
+            // Get a reference to the video element and getUserMedia function
+            const video = document.getElementById('webcam');
+            //const modifiedImage = document.getElementById('modified-image');
+            const container = document.getElementById('container');
+            const startButton = document.getElementById('startButton');
+            const condition1 = document.getElementById('con1');
+            const condition2 = document.getElementById('con2');
+            const timerElement = document.getElementById('timer');
+            const recordedVideo = document.getElementById('recordedVideo');
+            const uploadButton = document.getElementById('uploadButton');
+
+            let videoStream;
+            let angleValue, brigthnessValue;
+
+            let countdown = 10000;
+            let startTime;
+            let timerInterval;
+            let paused = false;
+            let timeRemaining = countdown;
+            let state = 0;
+
+            let mediaRecorder;
+            let recordedChunks = [];
+
+            async function startCamera() {
+                navigator.mediaDevices
+                .getUserMedia({ video: true }) // Request access to the user's webcam
+                .then(function (stream) {
+                    video.srcObject = stream; // Set the stream as the source for the video element
+                    video.style.display = 'block';
+                    startSendingFrames(stream);
+                    container.removeChild(startButton);
+                    videoStream = stream;
+                    condition1.textContent = "แสงสว่างเพียงพอ"
+                    condition1.style.color = 'red';
+                    condition2.style.display = 'inline';
+                    timerElement.style.display = 'inline';
+                    state = 1;
+
+                    mediaRecorder = new MediaRecorder(stream);
+                    startRecordVideo();
+                })
+                .catch(function (error) {
+                    console.error('Error accessing the webcam:', error);
+                });
+            }
+
+            // Add this function to stop the media stream
+            function stopCamera() {
+                clearInterval(frameSendingInterval1);
+                if (videoStream) {
+                    /*const tracks = videoStream.getTracks();
+
+                    tracks.forEach((track) => {
+                        track.stop(); // Stop each track in the stream
+                    });*/
+                    videoStream.getTracks().forEach((track) => {
+                        track.stop(); // Stop each track in the stream
+                    });
+                    
+                    video.srcObject = null; // Clear the video element's source
+                    video.style.display = 'none';  //Hide the video element
+                    videoStream = null; // Clear the reference to the video stream
+
+                }
+            }
+
+            function updateCountdown() {
+                const timerElement = document.getElementById('timer');
+                if (startTime == null){
+                    startTime = Date.now();
+                }
+                if (!paused) {
+                    const elapsedTime = Date.now() - startTime;
+                    timeRemaining = countdown - elapsedTime;
+
+                    if (timeRemaining <= 0) {
+                        if(state != 0){
+                            countdown = 10000;
+                            startTime == null;
+                            state += 1;
+                        }
+                    } else {
+                        timerElement.textContent = (timeRemaining / 1000).toFixed(3);
+                    }
+                }
+                timerInterval = requestAnimationFrame(updateCountdown);
+            }
+
+            function condition_scanner(HeadAngle, Framebrightness){
+
+                if (Framebrightness == "good brightness"){
+                    condition1.style.color = 'green'
+                    condition1.textContent = "แสงสว่างเพียงพอ"
+                }
+                else if(Framebrightness == "too dark"){
+                    condition1.style.color = 'red'
+                    condition1.textContent = "แสงน้อยเกินไป โปรดหาที่ที่มีแสงสว่างเพียงพอ"
+                }
+                else if(Framebrightness == "too bright"){
+                    condition1.style.color = 'red'
+                    condition1.textContent = "แสงมากเกินไป โปรดหาที่ที่มีแสงน้อยลง"
+                }
+
+                switch(state){
+                    case 1:
+                        if (HeadAngle == "look forward"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณามองตรงมาที่กล้อง (1/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณามองตรงมาที่กล้อง (1/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 2:
+                        if (HeadAngle == "Turn Left"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาหันไปทางซ้าย (2/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาหันไปทางซ้าย (2/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 3:
+                        if (HeadAngle == "Turn Right"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาหันไปทางขวา (3/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาหันไปทางขวา (3/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 4:
+                        if (HeadAngle == "look forward down"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาก้มหน้าลง (4/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาก้มหน้าลง (4/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 5:
+                        if (HeadAngle == "Turn Left down"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาก้มหน้าลงและหันไปทางซ้าย (5/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาก้มหน้าลงและหันไปทางซ้าย (5/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 6:
+                        if (HeadAngle == "Turn Right down"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาก้มหน้าลงและหันไปทางขวา (ุ6/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาก้มหน้าลงและหันไปทางขวา (6/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 7:
+                        if (HeadAngle == "look forward up"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้น (ุ7/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้น (7/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 8:
+                        if (HeadAngle == "Turn Left up"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้นและหันไปทางซ้าย (ุ8/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้นและหันไปทางซ้าย (8/9)"
+                            paused = true;
+                        }
+                        break;
+                    case 9:
+                        if (HeadAngle == "Turn Right up"){
+                            condition2.style.color = 'green'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้นและหันไปทางขวา (ุ9/9)"
+                            timerElement.style.color = 'green'
+                            updateCountdown();
+                            paused = false;
+                        }else{
+                            condition2.style.color = 'red'
+                            timerElement.style.color = 'red'
+                            condition2.textContent = "กรุณาเงยหน้าขึ้นและหันไปทางขวา (9/9)"
+                            paused = true;
+                        }
+                        break;
+                    default:
+                        state = 0;
+                        condition1.textContent = "เก็บข้อมูลใบหน้าสมบูรณ์ กรุณาตรวจสอบ ก่อนทำการอัปโหลด";
+                        condition2.style.display = 'none';
+                        timerElement.style.display = 'none';
+                        mediaRecorder.stop();
+                        uploadButton.style.display = 'block';
+                        stopCamera();
+                        clearInterval(frameSendingInterval1);
+                        break;
+                }
+            }
+
+            // Check if the user's browser supports getUserMedia
+            startButton.addEventListener('click', () => {
+                startCamera();
+                
+            });
+            
+            uploadButton.addEventListener('click', () => {
+                // Check if there's a recorded video to upload
+                if (recordedChunks.length === 0) {
+                    alert('No recorded video available.');
+                    return;
+                }
+
+                // Create a Blob from the recorded chunks
+                const recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+
+                // Create a FormData object to send the blob as a file upload
+                const formData = new FormData();
+                formData.append('video', recordedBlob, 'recorded-video.webm');
+
+                // Send the video data to your Django backend using the Fetch API
+                fetch('/video_receive/', {
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => {
+                    if (response.ok) {
+                        // Handle success
+                        condition1.textContent = "อัปโหลดเสร็จสมบูรณ์!";
+                        condition1.style.color = 'green';
+                        uploadButton.style.display = 'none';
+                        recordedVideo.style.display = 'none';
+                        //alert('Video uploaded successfully!');
+                    } else {
+                        // Handle errors
+                        condition1.textContent = "เกิดข้อผิดพลาด ไม่สามารถอัปโหลดได้ โปรดลองใหม่อีกครั้งภายหลัง";
+                        condition1.style.color = 'red';
+                        uploadButton.style.display = 'none';
+                        recordedVideo.style.display = 'none';
+                        alert('Error uploading video.');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error uploading video:', error);
+                });
+            });
+
+            function startRecordVideo(){
+                mediaRecorder.ondataavailable = event => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
+
+                mediaRecorder.onstop = () => {
+                    const recordedBlob = new Blob(recordedChunks, { type: 'video/webm' });
+                    const recordedVideoURL = URL.createObjectURL(recordedBlob);
+
+                    recordedVideo.src = recordedVideoURL;
+                    video.style.display = 'none';
+                    recordedVideo.addEventListener('loadedmetadata', () => {
+                        recordedVideo.style.display = 'inline'; // Show the recorded video element.
+                        // The video is fully loaded and buffered, start playing it
+                        recordedVideo.play();
+                    });
+                    
+                };
+
+                mediaRecorder.start();
+            }
+
+            // Function to send frames to Django every 1 second
+            function startSendingFrames(stream) {
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+
+                frameSendingInterval1 = setInterval(function () {
+                    // Capture a frame from the webcam and draw it on the canvas
+
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                    // Convert the canvas content to a base64-encoded JPEG image
+                    const imageData = canvas.toDataURL('image/jpeg');
+
+                    canvas.toBlob(function (blob) {
+                        if (!blob) {
+                            console.error('Error creating blob from canvas data');
+                            return;
+                        }
+
+                        // Create a FormData object to send the blob as a file upload
+                        const formData = new FormData();
+                        formData.append('image', blob, 'frame.jpg');
+                        fetch('/capture_frame/', {
+                            method: 'POST',
+                            body: formData,
+                        })
+                        .then(response => {
+                            if (response.ok) {
+                                //return response.blob();
+                                return response.json();
+                            } else {
+                                throw new Error('Image processing failed.');
+                            }
+                        })
+                        .then(data => {
+                            const objectURL = URL.createObjectURL(blob);
+                            
+                            angleValue = data.angle;
+                            brigthnessValue = data.brigthness;
+                            condition_scanner(angleValue,brigthnessValue);
+                            if (paused) {
+                                startTime = Date.now() - (countdown - timeRemaining);
+                            } else {
+                                countdown = timeRemaining;
+                                startTime = Date.now();
+                            }
+                        })
+                        .catch(function (error) {
+                            console.error('Error sending frame:', error);
+                            
+                        });
+                    }, 'image/jpeg');
+                }, 1000/2); // Send a frame every 1 second
+            }
+        });
+    </script>
+</body>
+</html>

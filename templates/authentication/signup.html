@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign Up</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0px 0px 10px rgba(0,0,0,0.2);
+            width: 300px;
+        }
+        .container h2 {
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+            margin-right: 15px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: bold;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .btn {
+            background-color: #007bff;
+            color: #fff;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .btn:hover {
+            background-color: #0056b3;
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 15px;
+        }
+        .login-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Sign Up</h2>
+        
+        {% if messages %}
+        <div class="alert alert-danger">
+            <ul>
+                {% for message in messages %}
+                <li>{{ message }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %}
+
+        <form action="/signup" method="POST">
+            <div class="form-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Create a username" required>
+                <span id="username-availability"></span>
+            </div>
+            <div class="form-group">
+                <label for="fname">First Name</label>
+                <input type="text" id="fname" name="fname" placeholder="Enter your First Name" required>
+            </div>
+            <div class="form-group">
+                <label for="lname">Last Name</label>
+                <input type="text" id="lname" name="lname" placeholder="Enter your Last Name" required>
+            </div>
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter your Email Address" required>
+                <span id="email-availability"></span>
+            </div>
+            <div class="form-group">
+                <label for="pass1">Password</label>
+                <input type="password" id="pass1" name="pass1" placeholder="Create a Password" required>
+                <span id="password-length"></span>
+            </div>
+            <div class="form-group">
+                <label for="pass1">Confirm your Password</label>
+                <input type="password" id="pass2" name="pass2" placeholder="Confirm your Password" required>
+                <span id="password-match"></span>
+            </div>
+            <button type="submit" class="btn">Sign Up</button>
+        </form>
+        <div class="login-link">
+            Already have an account? <a href="{% url 'signin' %}">Login</a>
+        </div>
+    </div>
+    <script>
+        const usernameInput = document.getElementById('username');
+        const emailInput = document.getElementById('email');
+        const pass1Input = document.getElementById('pass1');
+        const pass2Input = document.getElementById('pass2');
+        const usernameAvailability = document.getElementById('username-availability');
+        const emailAvailability = document.getElementById('email-availability');
+        const passwordMatch = document.getElementById('password-match');
+        const passwordLength = document.getElementById('password-length');
+        const signupButton = document.getElementById('signup-button');
+
+        function validateUsername() {
+            const username = usernameInput.value.trim(); // Remove leading/trailing spaces
+
+            if (username === '') {
+                usernameAvailability.textContent = 'Username cannot be empty';
+                usernameAvailability.style.color = 'red';
+                signupButton.disabled = true;
+            } else if (/\s/.test(username)) {
+                usernameAvailability.textContent = 'Username cannot contain spaces';
+                usernameAvailability.style.color = 'red';
+                signupButton.disabled = true;
+            } else if (username.length < 5 || username.length > 15) {
+                usernameAvailability.textContent = 'Username must be between 5 and 15 characters';
+                usernameAvailability.style.color = 'red';
+                signupButton.disabled = true;
+            } else {
+                // Check username existence on the server
+                fetch(`/check_username?username=${username}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.available) {
+                            usernameAvailability.textContent = 'Username is available!';
+                            usernameAvailability.style.color = 'green';
+                            signupButton.disabled = false;
+                        } else {
+                            usernameAvailability.textContent = 'Username is taken. Please choose another.';
+                            usernameAvailability.style.color = 'red';
+                            signupButton.disabled = true;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking username availability:', error);
+                    });
+            }
+        }
+
+        function validateEmail() {
+            const email = emailInput.value.trim();
+
+            // Check for a valid email format (you can add more complex validation here)
+            const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+            if (!emailIsValid) {
+                emailAvailability.textContent = 'Invalid email format';
+                emailAvailability.style.color = 'red';
+                signupButton.disabled = true;
+            } else {
+                // Check email existence on the server
+                fetch(`/check_email?email=${email}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.available) {
+                            emailAvailability.textContent = 'Email is available!';
+                            emailAvailability.style.color = 'green';
+                            signupButton.disabled = false;
+                        } else {
+                            emailAvailability.textContent = 'Email is taken. Please choose another.';
+                            emailAvailability.style.color = 'red';
+                            signupButton.disabled = true;
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error checking email availability:', error);
+                    });
+            }
+        }
+        
+        function validatePassword1() {
+            const pass1 = pass1Input.value;
+            const pass2 = pass2Input.value;
+
+            if (pass1.length < 8) {
+                passwordLength.textContent = 'Password must be at least 8 characters long';
+                passwordLength.style.color = 'red';
+                signupButton.disabled = true;
+            } else {
+                passwordLength.textContent = '';
+                signupButton.disabled = false;
+            }
+        }
+
+        function validatePassword2() {
+            const pass1 = pass1Input.value;
+            const pass2 = pass2Input.value;
+
+            if (pass1 !== pass2) {
+                passwordMatch.textContent = 'Passwords do not match';
+                passwordMatch.style.color = 'red';
+                signupButton.disabled = true;
+            }  else {
+                passwordMatch.textContent = '';
+                signupButton.disabled = false;
+            }
+        }
+
+
+        usernameInput.addEventListener('input', validateUsername);
+        emailInput.addEventListener('input', validateEmail);
+        pass1Input.addEventListener('input', validatePassword1);
+        pass2Input.addEventListener('input', validatePassword2);
+        //validateUsername();  Validate on page load
+        //validateEmail();  Validate on page load
+        //validatePassword(); // Validate on page load
+    </script>
+</body>
+</html>
